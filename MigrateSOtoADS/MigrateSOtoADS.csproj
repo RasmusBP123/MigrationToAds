@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.TeamFoundationServer.Client" Version="16.153.0" />
+    <PackageReference Include="Microsoft.VisualStudio.Services.Client" Version="16.153.0" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TimeLogLibrary\TimeLogLibrary.csproj" />
+  </ItemGroup>
+
+</Project>
