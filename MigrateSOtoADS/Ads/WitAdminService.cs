@@ -32,13 +32,35 @@ namespace MigrateSOtoADS.AzureDevopServer
             var directory = ConfigurationManager.AppSettings["OutputDirectory"].EscapeString();
             var argument = $"exportwitd /collection:{url} /p:\"{project}\" /n:\"{projectType}\" /f:{directory}";
             StartCommand(fullPath, argument);
-            Console.ReadLine();
         }
 
         public void OverwriteXmlDocument(List<Project> projects)
         {
-            var document = XDocument.Load(ConfigurationManager.AppSettings["ImportDirectory"].EscapeString());
-            
+            var document = XDocument.Load("C:\\Users\\virpen\\OneDrive - Vitecsoftware Group AB\\Desktop\\xml\\productBacklog12.xml");
+            var fields = document.Descendants("FIELDS");
+
+            var listItems = fields.Elements("FIELD").Where(x => x.FirstAttribute.Value == "Timelog").Elements("SUGGESTEDVALUES").FirstOrDefault();
+            listItems.RemoveAll();
+
+            var concatList = new List<string>();
+            foreach (var project in projects)
+            {
+                foreach (var task in project.Tasks)
+                {
+                    concatList.Add(project.Name + " " + task);
+                }
+            }
+
+            var removeDuplicates = concatList.Distinct();
+            foreach (var project in removeDuplicates)
+            {
+                Console.WriteLine(project);
+                var xelement = new XElement("LISTITEM", new XAttribute("value", project));
+                listItems.Add(xelement);
+            }
+
+            document.Save("C:\\Users\\virpen\\OneDrive - Vitecsoftware Group AB\\Desktop\\xml\\productBacklog12.xml");
+            Console.WriteLine("DONE");
         }
 
 
@@ -51,6 +73,7 @@ namespace MigrateSOtoADS.AzureDevopServer
             customModulesListItems.RemoveAll();
             foreach (var item in data)
             {
+
                 var xelement = new XElement("LISTITEM", new XAttribute("value", item.Name));
                 customModulesListItems.Add(xelement);
             }
