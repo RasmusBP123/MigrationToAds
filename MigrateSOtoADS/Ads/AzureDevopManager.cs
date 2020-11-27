@@ -17,15 +17,16 @@ namespace MigrateSOtoADS.AzureDevopServer
     class AzureDevopManager
     {
         private VssConnection connection;
-        string collectionUri = "https://tfstest.vitec.se/tfs/Aloc";
         VssCredentials creds = new VssBasicCredential(string.Empty, "yziwndm3ubidxgtuen7ngnv7kjmxxrvyx52ear2j77jzwcfz6cyq");
         //string credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes("kervt4vhkhgmav2gz5rctsh2t2ppn2d5sfbklhbqlyzjo3auojja"));
         WorkItemTrackingHttpClient _workItemTrackingHttpClient;
+        private readonly int _projectId;
 
-        public AzureDevopManager(string collectionUri)
+        public AzureDevopManager(string collectionUri, int projectId)
         {
             connection = new VssConnection(new Uri(collectionUri), creds);
             _workItemTrackingHttpClient = connection.GetClient<WorkItemTrackingHttpClient>();
+            _projectId = projectId;
         }
 
         public async Task MigrateAllTicketsFromAProjectToAzureDevopServer(string projectName, List<Ticket> tickets)
@@ -95,6 +96,62 @@ namespace MigrateSOtoADS.AzureDevopServer
             }
         }
 
+        private JsonPatchDocument CreateJsonPatchDocument(Ticket ticket)
+        {
+            //Message on an rfc, can be created before a ticket is created. If that is the case, we set the ticket creation date to the date of the first message created.
+            var createdAt = SetTicketCreatedToFirstMessageCreated(ticket);
+            var deadline = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(ticket.Deadline, "UTC").ToString("yyyy-MM-ddTHH:mm:ss.ff") + "Z";
+            var priority = ticket.Priority.ToString();
+
+            var license = "";
+            if (ticket.Licence != null)
+                license = ticket.Licence.LicenceNo;
+
+            if (ticket.Priority >= 6)
+                priority = "";
+
+            var patchDocument = new JsonPatchDocument
+            {
+                CreateField("/fields/System.Title", ticket.Title),
+                CreateTags("/fields/System.Tags", new List<string>{ "RFC " + ticket.Id.ToString(), ticket.Tag1, ticket.Tag2, ticket.Tag3, license }),
+                CreateField("/fields/System.AssignedTo", GetUniqueName(ticket.CreatedBy.Email)),
+                CreateField("/fields/System.CreatedDate", createdAt),
+                CreateField("/fields/System.ChangedDate", createdAt),
+                CreateField("/fields/Microsoft.VSTS.Scheduling.FinishDate", deadline),
+                CreateField("/fields/System.ChangedBy", GetUniqueName(ticket.CreatedBy.EmailOriginal)),
+                CreateField("/fields/System.CreatedBy", GetUniqueName(ticket.CreatedBy.EmailOriginal)),
+                CreateField("/fields/Microsoft.VSTS.Scheduling.OriginalEstimate", ticket.Estimate.ToString()),
+                CreateField("/fields/Microsoft.VSTS.Common.Priority", priority),
+            };
+
+            if (ticket.ReleaseNoteDescription.Length == 0 && 1 == 2)
+            {
+                patchDocument.Add(CreateField("/fields/Aloc.ReleaseNoteDescription", ticket.Description ?? ""));
+                patchDocument.Add(CreateField("/fields/Aloc.ReleaseNoteType", Enum.GetName(typeof(ReleaseNotes), ticket.ReleaseNoteType)));
+            }
+
+            return patchDocument;
+        }
+        private async Task CreateMessagesOnATicket(Ticket ticket, WorkItem workItem)
+        {
+            if (ticket.Messages != null)
+            {
+                foreach (Message msg in ticket.Messages)
+                {
+                    var messageCreated = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(msg.Created, "UTC").ToString("yyyy-MM-ddTHH:mm:ss.ff") + "Z";
+
+                    JsonPatchDocument message = new JsonPatchDocument
+                    {
+                        CreateField("/fields/System.History", msg.HtmlBody),
+                        CreateField("/fields/System.ChangedBy", GetUniqueName(msg.Email)),
+                        CreateField("/fields/System.ChangedDate", messageCreated)
+                    };
+
+                    WorkItem rs = await _workItemTrackingHttpClient.UpdateWorkItemAsync(message, workItem.Id.Value, null, true);
+                    Console.WriteLine("Bug Successfully Created: Comment #{0}", rs.Id);
+                }
+            }
+        }
 
         private async Task SetAreaForTicket(Ticket ticket, JsonPatchDocument patchDocument, string projectName)
         {
@@ -104,9 +161,9 @@ namespace MigrateSOtoADS.AzureDevopServer
             {
                 //It will throw an error if project does not exists and be created under a special area.
                 //Only way to check if the tickets project is in an invalid state..
-                var area = await _workItemTrackingHttpClient.GetClassificationNodeAsync(projectName, TreeStructureGroup.Areas, ticket.Project);
+                var area = await _workItemTrackingHttpClient.GetClassificationNodeAsync(projectName, TreeStructureGroup.Areas, "");
                 if (area != null)
-                    patchDocument.Add(CreateField("/fields/System.AreaPath", projectName + "\\" + ticket.Project));
+                    patchDocument.Add(CreateField("/fields/System.AreaPath", projectName + "\\" + ""));
             }
             catch (Exception ex)
             {
@@ -154,63 +211,6 @@ namespace MigrateSOtoADS.AzureDevopServer
                 patchDocument.Add(CreateField("/fields/System.State", "Proposed"));
         }
 
-        private async Task CreateMessagesOnATicket(Ticket ticket, WorkItem workItem)
-        {
-            if (ticket.Messages != null)
-            {
-                foreach (Message msg in ticket.Messages)
-                {
-                    var messageCreated = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(msg.Created, "UTC").ToString("yyyy-MM-ddTHH:mm:ss.ff") + "Z";
-
-                    JsonPatchDocument message = new JsonPatchDocument
-                    {
-                        CreateField("/fields/System.History", msg.HtmlBody),
-                        CreateField("/fields/System.ChangedBy", GetUniqueName(msg.Email)),
-                        CreateField("/fields/System.ChangedDate", messageCreated)
-                    };
-
-                    WorkItem rs = await _workItemTrackingHttpClient.UpdateWorkItemAsync(message, workItem.Id.Value, null, true);
-                    Console.WriteLine("Bug Successfully Created: Comment #{0}", rs.Id);
-                }
-            }
-        }
-
-        private JsonPatchDocument CreateJsonPatchDocument(Ticket ticket)
-        {
-            //Message on an rfc, can be created before a ticket is created. If that is the case, we set the ticket creation date to the date of the first message created.
-            var createdAt = SetTicketCreatedToFirstMessageCreated(ticket);
-            var deadline = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(ticket.Deadline, "UTC").ToString("yyyy-MM-ddTHH:mm:ss.ff") + "Z";
-            var priority = ticket.Priority.ToString();
-
-            var license = "";
-            if (ticket.Licence != null)
-               license = ticket.Licence.LicenceNo;
-
-            if (ticket.Priority >= 6)
-                priority = "";
-
-            var patchDocument =  new JsonPatchDocument
-            {
-                CreateField("/fields/System.Title", ticket.Title),
-                CreateTags("/fields/System.Tags", new List<string>{ "RFC " + ticket.Id.ToString(), ticket.Tag1, ticket.Tag2, ticket.Tag3, license }),
-                CreateField("/fields/System.AssignedTo", GetUniqueName(ticket.CreatedBy.Email)),
-                CreateField("/fields/System.CreatedDate", createdAt),
-                CreateField("/fields/System.ChangedDate", createdAt),
-                CreateField("/fields/Microsoft.VSTS.Scheduling.FinishDate", deadline),
-                CreateField("/fields/System.ChangedBy", GetUniqueName(ticket.CreatedBy.EmailOriginal)),
-                CreateField("/fields/System.CreatedBy", GetUniqueName(ticket.CreatedBy.EmailOriginal)),
-                CreateField("/fields/Microsoft.VSTS.Scheduling.OriginalEstimate", ticket.Estimate.ToString()),
-                CreateField("/fields/Microsoft.VSTS.Common.Priority", priority),
-            };
-
-            if (ticket.ReleaseNoteDescription.Length == 0 && 1 == 2)
-            {
-                patchDocument.Add(CreateField("/fields/Aloc.ReleaseNoteDescription", ticket.Description ?? ""));
-                patchDocument.Add(CreateField("/fields/Aloc.ReleaseNoteType", Enum.GetName(typeof(ReleaseNotes), ticket.ReleaseNoteType)));
-            }
-
-            return patchDocument;
-        }
         private string SetTicketCreatedToFirstMessageCreated(Ticket ticket)
         {
             var createdAt = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(ticket.CreatedAt, "UTC").ToString("yyyy-MM-ddTHH:mm:ss.ff") + "Z";

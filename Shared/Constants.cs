@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace MigrateSOtoADS.Superoffice
+namespace Shared.Utilities
 {
     public static class Constants
     {
@@ -35,5 +35,23 @@ namespace MigrateSOtoADS.Superoffice
         public static string CMMI { get; set; } = "Requirement";
         public static string AGILE { get; set; } = "Product Backlog Item";
 
+    }
+    public enum CsvColumns : int
+    {
+        TimelogProjectIds = 0,
+        TimeLogProjectName = 1,
+        SuperOfficeIds = 2, 
+        SuperOfficeProjectNames = 3,
+        AdsProjectName = 4,
+        AdsArea = 5,
+        AdsIteration = 6
+    }
+
+    public enum Products
+    {
+        PORTMAN,
+        IDEAS,
+        DATA,
+        SUPERPORT,
     }
 }

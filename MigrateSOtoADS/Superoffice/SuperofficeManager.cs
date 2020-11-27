@@ -261,7 +261,8 @@ namespace MigrateSOtoADS.Superoffice
                                     FULL OUTER JOIN[SuperOffice].[CRM7].[EJUSER] a2 ON a2.[id] = t1.[created_by]
                                     FULL OUTER JOIN (SELECT distinct [X_PARENT] FROM [SuperOffice].[CRM7].[TICKET] t2 WHERE X_SAGSTYPE in ('Problem', 'Incident')) a3 ON a3.[X_PARENT] = t1.id
 									LEFT OUTER JOIN y_release_notes ON 
-									y_release_notes.x_sagsnummer = {id}";
+									y_release_notes.x_sagsnummer = t1.id
+                                    WHERE t1.id = {id}";
 
 
             SqlConnection Connection = new SqlConnection(connectionString);
@@ -320,15 +321,15 @@ namespace MigrateSOtoADS.Superoffice
                     var releaseNote = reader["x_type"].ToString();
 
                     if (releaseNote == "Nyheder")
-                        ticket.ReleaseNoteType = (ReleaseNotes)Enum.Parse(typeof(ReleaseNotes), "Nyheder");
+                        ticket.ReleaseNoteType = (ReleaseNotes)Enum.Parse(typeof(ReleaseNotes), "New");
                     if(releaseNote == "Rettelse")
-                        ticket.ReleaseNoteType = (ReleaseNotes)Enum.Parse(typeof(ReleaseNotes), "Rettelse");
+                        ticket.ReleaseNoteType = (ReleaseNotes)Enum.Parse(typeof(ReleaseNotes), "Correction");
                     if (releaseNote == "Ændring")
-                        ticket.ReleaseNoteType = (ReleaseNotes)Enum.Parse(typeof(ReleaseNotes), "Ændring");
+                        ticket.ReleaseNoteType = (ReleaseNotes)Enum.Parse(typeof(ReleaseNotes), "Change");
                     if (releaseNote == "Andet")
-                        ticket.ReleaseNoteType = (ReleaseNotes)Enum.Parse(typeof(ReleaseNotes), "Andet");
+                        ticket.ReleaseNoteType = (ReleaseNotes)Enum.Parse(typeof(ReleaseNotes), "Other");
                     if (releaseNote == "Ignorer")
-                        ticket.ReleaseNoteType = (ReleaseNotes)Enum.Parse(typeof(ReleaseNotes), "Ignorer");
+                        ticket.ReleaseNoteType = (ReleaseNotes)Enum.Parse(typeof(ReleaseNotes), "Ignore");
 
                     ticket.Messages = GetMessages(ticket.Id);
                 }

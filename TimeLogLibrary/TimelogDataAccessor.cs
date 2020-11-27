@@ -15,6 +15,23 @@ namespace Timelog
             client = new HttpClient();
         }
 
+        public string GetProject(int projectTypeId)
+        {
+            var projectType = "";
+
+            switch (projectTypeId)
+            {
+                case 252: projectType = "PORTMAN"; break;
+                case 253: projectType = "IDEAS - migrering";  break;
+                case 254: projectType = "Data"; break;
+                case 256: projectType = "Superport"; break;
+                default:
+                    break;
+            }
+
+            return projectType;
+        }
+
         public async Task<List<Project>> GetTimelogProjectData()
         {
             var url = @"https://app3.timelog.com/vitec/service.asmx/GetProjectsShortList?sitecode=3a933f7f6a424f4585a53c469&apiID=vitecaloc&apiPassword=5a53c469&status=1&customerID=-1&projectManagerId=-1";
@@ -26,7 +43,6 @@ namespace Timelog
 
             var projectids = new List<string>();
             var name = projectsRawList.Root.Name.Namespace;
-
 
             var nodes = projectsRawList.Root.Elements(name + "Project");
 
@@ -42,7 +58,6 @@ namespace Timelog
                 var result2 = await client.GetAsync($@"https://app3.timelog.com/vitec/service.asmx/GetProjectsRaw?sitecode=3a933f7f6a424f4585a53c469&apiID=vitecaloc&apiPassword=5a53c469&projectID={projectId}&status=1&customerID=-1&projectManagerId=-1");
 
                 var projectRaw = XDocument.Parse(await result2.Content.ReadAsStringAsync());
-
 
                 var node = projectRaw.Root.Descendants(name + "Project");
                 var typeId = node.Elements(name + "ProjectTypeID").FirstOrDefault().Value;

@@ -1,9 +1,8 @@
 ﻿using MigrateSOtoADS.AzureDevopServer;
 using MigrateSOtoADS.Superoffice;
-using System;
+using Shared.Utilities;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Timelog;
 
 namespace MigrateSOtoADS
 {
@@ -11,31 +10,17 @@ namespace MigrateSOtoADS
     {
         static async Task Main(string[] args)
         {
+            var projectName = "IDEAS - All Projects";
+            var projectId = 4743;
 
-            var wit = new WitAdminService();
-            var projectName = "IDEAS - migrering";
-            wit.ExtractXmlProductBackLogItemsIntoDirectory(Constants.URL_TFS_TEST_VTEC, projectName, Constants.CMMI);
-
-            var timelogAccessor = new TimelogDataAccessor();
-            var projects = await timelogAccessor.GetTimelogProjectData();
-
-            wit.OverwriteXmlDocument(projects);
-            wit.ImportCustomFieldListItemsToTFS(Constants.URL_TFS_TEST_VTEC, projectName);
-            Console.ReadLine();
+            SuperofficeManager smgr = new SuperofficeManager("Data Source=prodsrv230.aloc.com;Initial Catalog=SuperOffice;User ID=soupdater;Password=7cET!QCM", projectId.ToString());
             
-            //var projectId = "2742";
+            List<Ticket> tickets = smgr.GetTickets();
+            var azure = new AzureDevopManager(Constants.URL_TFS_TEST_VTEC, projectId);
+            await azure.MigrateAllTicketsFromAProjectToAzureDevopServer(projectName, tickets);
 
-            //SuperofficeManager smgr = new SuperofficeManager("Data Source=prodsrv230.aloc.com;Initial Catalog=SuperOffice;User ID=soupdater;Password=7cET!QCM", projectId);
-            //List<Ticket> tickets = smgr.GetTickets();
-
-            //var ticket = smgr.GetSingleTicket(17502);
-
-            //var azure = new AzureDevopManager(Constants.URL_TFS_VITEC);
-
+            //var ticket = smgr.GetSingleTicket(87679);
             //await azure.MigrateSingleTicketToAzureDevopsServer(projectName, ticket);
-            //await azure.MigrateAllTicketsFromAProjectToAzureDevopServer(projectName, tickets);
-
-            //var result = await smgr.GetTimeLogData();
         }
     }
 }
