@@ -61,7 +61,7 @@ namespace MigrateSOtoADS.AzureDevopServer
                 listItems.Add(xelement);
             }
 
-            document.Save("C:\\Users\\virpen\\OneDrive - Vitecsoftware Group AB\\Desktop\\xml\\productBacklog13.xml");
+            document.Save(directory);
         }
 
 
