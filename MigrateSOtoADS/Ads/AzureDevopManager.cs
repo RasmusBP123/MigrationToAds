@@ -11,6 +11,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
+using Shared;
+using Shared.Utilities;
 
 namespace MigrateSOtoADS.AzureDevopServer
 {
@@ -39,12 +41,8 @@ namespace MigrateSOtoADS.AzureDevopServer
                 {
                     var patchDocument = CreateJsonPatchDocument(ticket);
 
-                    //ticket.Project = ConvertDanishLettersToEnglish(project);
-
-                    await SetAreaForTicket(ticket, patchDocument, projectName);
-                    await CreateIterationIfNonExists(projectName, ticket);
+                    await SetAreaForTicket(patchDocument, projectName);
                     await SetIterationForTicket(ticket, patchDocument, projectName);
-                    
                     SetTicketStatus(ticket, patchDocument);
 
                     string workItemType = "Requirement";
@@ -73,9 +71,7 @@ namespace MigrateSOtoADS.AzureDevopServer
             {
                 var patchDocument = CreateJsonPatchDocument(ticket);
 
-                await SetAreaForTicket(ticket, patchDocument, projectName);
-
-                await CreateIterationIfNonExists(projectName, ticket);
+                await SetAreaForTicket(patchDocument, projectName);
                 await SetIterationForTicket(ticket, patchDocument, projectName);
                 
                 SetTicketStatus(ticket, patchDocument);
@@ -153,17 +149,18 @@ namespace MigrateSOtoADS.AzureDevopServer
             }
         }
 
-        private async Task SetAreaForTicket(Ticket ticket, JsonPatchDocument patchDocument, string projectName)
+        private async Task SetAreaForTicket(JsonPatchDocument patchDocument, string projectName)
         {
-            if (string.IsNullOrEmpty(ticket.Project))
-                return;
             try
             {
                 //It will throw an error if project does not exists and be created under a special area.
                 //Only way to check if the tickets project is in an invalid state..
-                var area = await _workItemTrackingHttpClient.GetClassificationNodeAsync(projectName, TreeStructureGroup.Areas, "");
+                var areaFromXml = GetFieldFromSuperOfficeProject(CsvColumns.SuperOfficeIds, CsvColumns.AdsArea);
+                var area = await _workItemTrackingHttpClient.GetClassificationNodeAsync(projectName, TreeStructureGroup.Areas, areaFromXml);
                 if (area != null)
-                    patchDocument.Add(CreateField("/fields/System.AreaPath", projectName + "\\" + ""));
+                {
+                    patchDocument.Add(CreateField("/fields/System.AreaPath", projectName + "\\" + areaFromXml));
+                }
             }
             catch (Exception ex)
             {
@@ -175,40 +172,64 @@ namespace MigrateSOtoADS.AzureDevopServer
 
         private async Task SetIterationForTicket(Ticket ticket, JsonPatchDocument patchDocument, string projectName)
         {
-            if (! string.IsNullOrWhiteSpace(ticket.PlannedInVersion))
+            try
             {
-                try
+                //It will throw an error if project does not exists and be created under a special area.
+                //Only way to check if the tickets iteration exists is in an invalid state..
+                var iteration = GetFieldFromSuperOfficeProject(CsvColumns.SuperOfficeIds, CsvColumns.AdsIteration);
+                if (string.IsNullOrWhiteSpace(iteration))
                 {
-                    //It will throw an error if project does not exists and be created under a special area.
-                    //Only way to check if the tickets iteration exists is in an invalid state..
-                    var area = await _workItemTrackingHttpClient.GetClassificationNodeAsync(projectName, TreeStructureGroup.Iterations, ticket.PlannedInVersion);
-                    if (area != null)
-                        patchDocument.Add(CreateField("/fields/System.IterationPath", projectName + "\\" + ticket.PlannedInVersion));
+                    patchDocument.Add(CreateField("/fields/System.IterationPath", projectName));
                 }
-                catch (Exception ex)
+                else
                 {
-                    //Maps the project to a dump area, when no relation between an iter and a project cannot be found
-                    //_logger.LogInformation(ex.Message, "Project could not be found: " + projectName);
+                    patchDocument.Add(CreateField("/fields/System.IterationPath", iteration));
                 }
             }
+            catch (Exception ex)
+            {
+                //Maps the project to a dump area, when no relation between an iter and a project cannot be found
+                //_logger.LogInformation(ex.Message, "Project could not be found: " + projectName);
+            }
+        }
+
+        public string GetFieldFromSuperOfficeProject(CsvColumns superofficeId, CsvColumns field)
+        {
+            var reader = new XmlReader(path: Config.XmlFilePath);
+
+            var projectids = reader.GetColumns(superofficeId).Select(x => Convert.ToInt32(x)).ToList();
+            var fields = reader.GetColumns(field);
+
+            //Connect superoffice projectId to area 
+            var dict = projectids.Select((keys, index) => new { k = keys, v = fields[index] }).ToDictionary(x => x.k, x => x.v);
+
+            var area = dict.FirstOrDefault(x => x.Key == _projectId).Value;
+          
+            return area;
         }
 
         private void SetTicketStatus(Ticket ticket, JsonPatchDocument patchDocument)
         {
             //13 == Klar til test 17 == Klar til levering 
             if (ticket.State == 13 || ticket.State == 17)
+            {
                 patchDocument.Add(CreateField("/fields/System.State", "Resolved"));
-
+            }
             //30 == Afventer felrettelse 28 == Under implementering 24 == Eskaleret
-            if (ticket.State == 30 || ticket.State == 28 || ticket.State == 24)
+            else if (ticket.State == 30 || ticket.State == 28 || ticket.State == 24)
+            {
                 patchDocument.Add(CreateField("/fields/System.State", "Active"));
+            }
 
             //18 == Leveret 11 == Løst 12 == Testet og godkendt
-            if (ticket.State == 18 || ticket.State == 11 || ticket.State == 12)
+            else if (ticket.State == 18 || ticket.State == 11 || ticket.State == 12)
+            {
                 patchDocument.Add(CreateField("/fields/System.State", "Closed"));
-
+            }
             else
+            {
                 patchDocument.Add(CreateField("/fields/System.State", "Proposed"));
+            }
         }
 
         private string SetTicketCreatedToFirstMessageCreated(Ticket ticket)

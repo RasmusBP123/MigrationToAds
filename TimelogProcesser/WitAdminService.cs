@@ -21,8 +21,7 @@ namespace MigrateSOtoADS.AzureDevopServer
         public void ImportCustomWitAdminXmlFileToTFS(string url, string project, List<Project> projects)
         {
 
-            var directory = ConfigurationManager.AppSettings["ImportDirectory"].EscapeString();
-            
+            var directory = ConfigurationManager.AppSettings["ImportDirectory"].EscapeString();            
             OverwriteXmlDocument(projects, directory.RemoveEscapeAtStartAndEnd());
 
             var argument = $"importwitd /collection:{url} /p:\"{project}\" /f:{directory}";

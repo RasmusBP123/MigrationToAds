@@ -28,16 +28,14 @@ namespace Shared
                 {
                     var list = reader.ReadLine();
                     var values = list.Split(';');
-
-                    if (!string.IsNullOrWhiteSpace(values[(int)column]))
-                    {
-                        rows.Add(values[(int)column]);
-                    }
+                    rows.Add(values[(int)column]);
+                   
                 }
             }
 
             //Two first rows are names of the column and we will skip them
             return rows.Skip(2).ToList();
         }
+
     }
 }

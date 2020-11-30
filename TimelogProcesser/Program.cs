@@ -14,23 +14,23 @@ namespace TimelogProcesser
     {
         static async Task Main(string[] args)
         {
-            var projectName = "7.25 Leverance TEST";
+            var masterTemplateProjectName = "7.25 Leverance TEST";
 
             var wit = new WitAdminService();
-            //wit.ExportTfsXmlDocument(Constants.URL_TFS_VITEC, projectName, Constants.CMMI);
+            wit.ExportTfsXmlDocument(Constants.URL_TFS_VITEC, masterTemplateProjectName, Constants.CMMI);
 
 
-            //var reader = new XmlReader(path: "C:\\Users\\virpen\\OneDrive - Vitecsoftware Group AB\\Desktop\\ideas migrering mapning.csv");
+            var reader = new XmlReader(path: Config.XmlFilePath);
 
-            //var projectids = reader.GetColumns(CsvColumns.TimelogProjectIds);
-            //var product = reader.GetColumns(CsvColumns.AdsProjectName).FirstOrDefault();
+            var projectids = reader.GetColumns(CsvColumns.TimelogProjectIds);
+            var product = reader.GetColumns(CsvColumns.AdsProjectName).FirstOrDefault();
 
             var timelogAccessor = new TimelogDataAccessor();
             var projects = await timelogAccessor.GetAllTimelogProjects();
 
             var sortedProducts = new List<Project>();
 
-            switch ("PORTMAN")
+            switch (product)
             {
                 case "PORTMAN":
                     sortedProducts = projects.Where(x => x.TypeId == "252").ToList(); break;
@@ -44,8 +44,8 @@ namespace TimelogProcesser
                     break;
             }
 
-            wit.ImportCustomWitAdminXmlFileToTFS(Constants.URL_TFS_VITEC, projectName, sortedProducts);
-            Console.WriteLine("Hello World!");
+            wit.ImportCustomWitAdminXmlFileToTFS(Constants.URL_TFS_TEST_VTEC, Config.ProjectName, sortedProducts);
+            Console.WriteLine("Process complete");
         }
     }
 }
